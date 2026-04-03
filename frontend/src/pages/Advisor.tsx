@@ -10,6 +10,10 @@ import CardTile from "../components/CardTile";
 import CategoryPicker from "../components/CategoryPicker";
 
 const USER_ID = 1;
+const CATEGORY_BUDGETS_STORAGE_KEY = `cardsmart.categoryBudgets.user.${USER_ID}`;
+
+type CategoryKey = "dining" | "groceries" | "travel" | "gas";
+type CategoryBudgets = Record<CategoryKey, number>;
 
 export default function Advisor() {
   const [category, setCategory] = useState("dining");
@@ -20,8 +24,11 @@ export default function Advisor() {
     useState<RecommendResponse | null>(null);
   const [txMessage, setTxMessage] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
+  const [decisionLogs, setDecisionLogs] = useState<string[]>([]);
   const [weeklyBudget, setWeeklyBudget] = useState(200);
   const [weeklyUsed, setWeeklyUsed] = useState(0);
+  const [categoryBudgets, setCategoryBudgets] =
+    useState<CategoryBudgets | null>(null);
 
   const parsedAmount = useMemo(() => Number(amount) || 0, [amount]);
 
@@ -40,24 +47,81 @@ export default function Advisor() {
     loadBudget();
   }, []);
 
-  const categoryStats = useMemo(() => {
-    const split: Record<string, number> = {
-      dining: 0.35,
-      groceries: 0.25,
-      travel: 0.22,
-      gas: 0.18,
+  useEffect(() => {
+    const fallback: CategoryBudgets = {
+      dining: weeklyBudget * 0.35,
+      groceries: weeklyBudget * 0.25,
+      travel: weeklyBudget * 0.22,
+      gas: weeklyBudget * 0.18,
     };
 
+    const raw = localStorage.getItem(CATEGORY_BUDGETS_STORAGE_KEY);
+    if (!raw) {
+      setCategoryBudgets(fallback);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<CategoryBudgets>;
+      setCategoryBudgets({
+        dining:
+          typeof parsed.dining === "number" ? parsed.dining : fallback.dining,
+        groceries:
+          typeof parsed.groceries === "number"
+            ? parsed.groceries
+            : fallback.groceries,
+        travel:
+          typeof parsed.travel === "number" ? parsed.travel : fallback.travel,
+        gas: typeof parsed.gas === "number" ? parsed.gas : fallback.gas,
+      });
+    } catch {
+      setCategoryBudgets(fallback);
+    }
+  }, [weeklyBudget]);
+
+  const categoryStats = useMemo(() => {
+    const budgets =
+      categoryBudgets ??
+      ({
+        dining: weeklyBudget * 0.35,
+        groceries: weeklyBudget * 0.25,
+        travel: weeklyBudget * 0.22,
+        gas: weeklyBudget * 0.18,
+      } satisfies CategoryBudgets);
+
+    const totalBudget = Object.values(budgets).reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+
     return Object.fromEntries(
-      Object.entries(split).map(([key, ratio]) => [
+      Object.entries(budgets).map(([key, budget]) => [
         key,
         {
-          budget: weeklyBudget * ratio,
-          used: weeklyUsed * ratio,
+          budget,
+          used: totalBudget > 0 ? weeklyUsed * (budget / totalBudget) : 0,
         },
       ]),
     );
-  }, [weeklyBudget, weeklyUsed]);
+  }, [categoryBudgets, weeklyBudget, weeklyUsed]);
+
+  function handleSelectCard(id?: number) {
+    const nextId = id ?? null;
+    setSelectedCardId(nextId);
+
+    if (!recommendation || nextId === null) return;
+
+    const selected = [
+      recommendation.recommended_card,
+      ...recommendation.alternatives,
+    ].find((card) => card.card_id === nextId);
+    if (!selected) return;
+
+    setDecisionLogs((prev) => [
+      ...prev,
+      `User selected ${selected.name} (•••• ${selected.last4}) with expected cashback $${selected.cashback_earned.toFixed(2)}.`,
+    ]);
+  }
 
   async function handleRecommend() {
     setError(null);
@@ -71,6 +135,25 @@ export default function Advisor() {
       });
       setRecommendation(result);
       setSelectedCardId(result.recommended_card.card_id);
+
+      const comparedCards = [
+        result.recommended_card,
+        ...result.alternatives,
+      ].slice(0, 2);
+      const compareLine = comparedCards
+        .map(
+          (card) =>
+            `${card.name} (rate ${card.cashback_rate.toFixed(1)}%, earn $${card.cashback_earned.toFixed(2)})`,
+        )
+        .join(" vs ");
+
+      setDecisionLogs([
+        `Checked category: ${category}.`,
+        `Checked amount: $${parsedAmount.toFixed(2)}.`,
+        `Checked budget context: used $${weeklyUsed.toFixed(2)} of $${weeklyBudget.toFixed(2)} this week.`,
+        `Compared cards: ${compareLine}.`,
+        `Decision: picked ${result.recommended_card.name} because ${result.recommended_card.reason}`,
+      ]);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Unable to fetch recommendation",
@@ -106,7 +189,10 @@ export default function Advisor() {
   }
 
   const recommendationCards = recommendation
-    ? [recommendation.recommended_card, ...recommendation.alternatives]
+    ? [recommendation.recommended_card, ...recommendation.alternatives].slice(
+        0,
+        2,
+      )
     : [];
 
   return (
@@ -145,7 +231,7 @@ export default function Advisor() {
             onClick={handleRecommend}
             type="button"
           >
-            {loading ? "Thinking..." : "Which card?"}
+            {loading ? "Analyzing..." : "Analyze"}
           </button>
         </div>
       </div>
@@ -177,7 +263,7 @@ export default function Advisor() {
                 key={card.card_id}
                 last4={card.last4}
                 name={card.name}
-                onSelect={(id) => setSelectedCardId(id ?? null)}
+                onSelect={handleSelectCard}
                 promo={
                   index === 0 ? "Top recommendation" : "Alternative option"
                 }
@@ -203,6 +289,19 @@ export default function Advisor() {
             <p className="mt-3 text-sm font-medium text-brand-700">
               {txMessage}
             </p>
+          ) : null}
+
+          {decisionLogs.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+                Decision log
+              </h4>
+              <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                {decisionLogs.map((log, index) => (
+                  <li key={`${log}-${index}`}>• {log}</li>
+                ))}
+              </ul>
+            </div>
           ) : null}
         </article>
       ) : null}

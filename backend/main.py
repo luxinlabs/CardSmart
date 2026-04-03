@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from .database import Base, engine
 from .routers import budget, cards, promotions, recommend, transactions
+
+load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 

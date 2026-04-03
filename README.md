@@ -7,7 +7,7 @@ CardSmart is a hackathon-ready credit card advisor that recommends the best card
 - Frontend: React + Tailwind (`frontend/`)
 - Backend: FastAPI + SQLAlchemy + SQLite (`backend/`)
 - Orchestration: n8n workflows (`n8n/workflows/`)
-- LLM: Claude API via `ANTHROPIC_API_KEY` (with fallback reason generation)
+- LLM: Minimax API via `MINIMAX_API_KEY` (with fallback reason generation)
 
 ## Repository Layout
 
@@ -29,6 +29,8 @@ CardSmart is a hackathon-ready credit card advisor that recommends the best card
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env
+# edit backend/.env and paste your real MINIMAX_API_KEY
 python -m backend.seed_data
 uvicorn backend.main:app --reload
 ```

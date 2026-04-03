@@ -39,3 +39,8 @@ pnpm-debug.log*
 # Build and logs
 coverage/
 *.log
+
+
+# env
+.env
+.env.example

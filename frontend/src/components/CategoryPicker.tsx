@@ -23,15 +23,15 @@ export default function CategoryPicker({
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4">
         {categories.map(([value, label]) => {
           const active = selected === value;
           return (
             <button
-              className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+              className={`min-h-40 rounded-3xl border px-6 py-6 text-xl font-bold transition ${
                 active
-                  ? "border-brand-500 bg-brand-500 text-white"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-brand-300"
+                  ? "border-brand-500 bg-brand-500 text-white shadow-lg"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:bg-slate-50"
               }`}
               key={value}
               onClick={() => onSelect(value)}

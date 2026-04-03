@@ -1,5 +1,15 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
+export type Card = {
+  id?: number;
+  card_id?: number;
+  user_id: number;
+  name: string;
+  issuer: string;
+  last4: string;
+  active?: boolean;
+};
+
 export type RecommendRequest = {
   user_id: number;
   category: string;
@@ -29,6 +39,25 @@ export type RecommendResponse = {
 export async function getCards(userId: number) {
   const response = await fetch(`${API_BASE}/cards?user_id=${userId}`);
   if (!response.ok) throw new Error("Failed to fetch cards");
+  const data = await response.json();
+  return data.cards || [];
+}
+
+export async function addCard(payload: {
+  user_id: number;
+  name: string;
+  issuer: string;
+  last4: string;
+}): Promise<Card> {
+  const response = await fetch(`${API_BASE}/cards`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to add card");
+  }
   return response.json();
 }
 

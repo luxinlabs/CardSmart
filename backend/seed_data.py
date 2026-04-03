@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 
 from .database import Base, SessionLocal, engine
-from .models import Card, Promotion, RewardRule, User
+from .models import Card, Promotion, RewardRule, Transaction, User
 
 
 def seed() -> None:
@@ -17,7 +17,7 @@ def seed() -> None:
             id=1,
             name="Demo User",
             budget_weekly=200.0,
-            budget_used=0.0,
+            budget_used=120.0,
             budget_alert_threshold=0.80,
             budget_last_reset_at=datetime.utcnow(),
         )
@@ -124,6 +124,27 @@ def seed() -> None:
                     discount_pct=discount_pct,
                     expires_at=expires_at,
                     url=url,
+                )
+            )
+
+        # Add sample transactions to demonstrate realistic spending
+        sample_transactions = [
+            (by_name["Amex Gold"].id, 45.50, "dining", 1.82),
+            (by_name["Amex Gold"].id, 32.00, "groceries", 1.28),
+            (by_name["Sapphire Preferred"].id, 18.75, "dining", 0.56),
+            (by_name["Cash Rewards"].id, 12.50, "gas", 0.38),
+            (by_name["Double Cash"].id, 8.25, "other", 0.17),
+        ]
+
+        for card_id, amount, category, cashback in sample_transactions:
+            db.add(
+                Transaction(
+                    user_id=user.id,
+                    card_id=card_id,
+                    amount=amount,
+                    category=category,
+                    cashback_earned=cashback,
+                    created_at=datetime.utcnow() - timedelta(hours=2),
                 )
             )
 

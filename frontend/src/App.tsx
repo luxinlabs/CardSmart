@@ -1,7 +1,7 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 
-import Advisor from "./pages/Advisor";
-import Budget from "./pages/Budget";
+import Analytics from "./pages/Analytics";
+import Cards from "./pages/Cards";
 import Dashboard from "./pages/Dashboard";
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -16,16 +16,22 @@ export default function App() {
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-extrabold text-brand-900">CardSmart</h1>
           <nav className="flex gap-2 rounded-full bg-slate-100 p-1">
-            <NavLink className={navClass} to="/">Advisor</NavLink>
-            <NavLink className={navClass} to="/budget">Budget</NavLink>
-            <NavLink className={navClass} to="/dashboard">Dashboard</NavLink>
+            <NavLink className={navClass} to="/">
+              Dashboard
+            </NavLink>
+            <NavLink className={navClass} to="/cards">
+              My Cards
+            </NavLink>
+            <NavLink className={navClass} to="/analytics">
+              Analytics
+            </NavLink>
           </nav>
         </header>
 
         <Routes>
-          <Route path="/" element={<Advisor />} />
-          <Route path="/budget" element={<Budget />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/cards" element={<Cards />} />
+          <Route path="/analytics" element={<Analytics />} />
         </Routes>
       </div>
     </div>

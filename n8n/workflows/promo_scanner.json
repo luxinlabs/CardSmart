@@ -1,0 +1,33 @@
+{
+  "name": "promo_scanner",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "hours", "hoursInterval": 24}]
+        }
+      },
+      "id": "DailyTrigger",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 260]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/promotions/refresh",
+        "method": "POST"
+      },
+      "id": "RefreshPromos",
+      "name": "Refresh Promotions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 260]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [[{"node": "Refresh Promotions", "type": "main", "index": 0}]]
+    }
+  }
+}

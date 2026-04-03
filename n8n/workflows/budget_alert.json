@@ -1,0 +1,54 @@
+{
+  "name": "budget_alert",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "minutes", "minutesInterval": 5}]
+        }
+      },
+      "id": "Schedule",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [180, 280]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/budget/status?user_id=1",
+        "method": "GET"
+      },
+      "id": "BudgetAPI",
+      "name": "Budget API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [390, 280]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.utilization_pct}}",
+              "operation": "largerEqual",
+              "value2": 80
+            }
+          ]
+        }
+      },
+      "id": "IfAlert",
+      "name": "If Alert",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [600, 280]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{"node": "Budget API", "type": "main", "index": 0}]]
+    },
+    "Budget API": {
+      "main": [[{"node": "If Alert", "type": "main", "index": 0}]]
+    }
+  }
+}

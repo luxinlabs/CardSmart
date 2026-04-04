@@ -28,7 +28,7 @@ type SmartRoutingTransaction = {
   cardName: string;
   last4: string;
   reason: string;
-  timestamp: Date;
+  timestamp: number;
 };
 
 type FlipTileProps = {
@@ -79,7 +79,7 @@ export default function Dashboard() {
   const [recommendation, setRecommendation] =
     useState<RecommendResponse | null>(null);
   const [decisionLogs, setDecisionLogs] = useState<string[]>([]);
-  const [weeklyBudget, setWeeklyBudget] = useState(200);
+  const [weeklyBudget, setWeeklyBudget] = useState(1000);
   const [weeklyUsed, setWeeklyUsed] = useState(0);
   const [categoryBudgets, setCategoryBudgets] =
     useState<CategoryBudgets | null>(null);
@@ -91,6 +91,23 @@ export default function Dashboard() {
   const [selectedCardCategory, setSelectedCardCategory] =
     useState<CategoryKey | null>(null);
   const [expandedCard, setExpandedCard] = useState<CategoryKey | null>(null);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryDescription, setNewCategoryDescription] = useState("");
+  const [newCategoryLimit, setNewCategoryLimit] = useState("");
+  const [newCategoryEmoji, setNewCategoryEmoji] = useState("📦");
+  const [customCategories, setCustomCategories] = useState<
+    Array<{
+      key: string;
+      title: string;
+      emoji: string;
+      description: string;
+      budget: number;
+      used: number;
+      usedPct: number;
+      gradient: string;
+    }>
+  >([]);
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [smartRoutingTransactions, setSmartRoutingTransactions] = useState<
     SmartRoutingTransaction[]
@@ -115,15 +132,24 @@ export default function Dashboard() {
     async function loadBudget() {
       try {
         const budget = await getBudgetStatus(USER_ID);
-        setWeeklyBudget(budget.budget_weekly ?? 200);
+        setWeeklyBudget(budget.budget_weekly ?? 1000);
         setWeeklyUsed(budget.budget_used ?? 0);
       } catch {
-        setWeeklyBudget(200);
+        setWeeklyBudget(1000);
         setWeeklyUsed(0);
       }
     }
 
     loadBudget();
+
+    const savedCategories = localStorage.getItem("cardsmart.customCategories");
+    if (savedCategories) {
+      try {
+        setCustomCategories(JSON.parse(savedCategories));
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -224,16 +250,20 @@ export default function Dashboard() {
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function openCategorySettings(cat: CategoryKey, event: React.MouseEvent) {
+  function openCategorySettings(cat: string, event: React.MouseEvent) {
     event.stopPropagation();
-    setSettingsCategory(cat);
+    setSettingsCategory(cat as CategoryKey);
     const budgets = categoryBudgets ?? {
       dining: weeklyBudget * 0.35,
       groceries: weeklyBudget * 0.25,
       travel: weeklyBudget * 0.22,
       gas: weeklyBudget * 0.18,
     };
-    setTempLimit(budgets[cat].toFixed(0));
+    const customCat = customCategories.find((c) => c.key === cat);
+    const limit = customCat
+      ? customCat.budget
+      : budgets[cat as CategoryKey] || 0;
+    setTempLimit(limit.toFixed(0));
   }
 
   function closeCategorySettings() {
@@ -274,6 +304,42 @@ export default function Dashboard() {
         [setting]: !prev[cat][setting],
       },
     }));
+  }
+
+  function handleAddCategory() {
+    if (!newCategoryName.trim() || !newCategoryLimit) return;
+
+    const gradients = [
+      "from-purple-500 to-pink-500",
+      "from-cyan-500 to-blue-500",
+      "from-green-500 to-teal-500",
+      "from-orange-500 to-red-500",
+      "from-yellow-500 to-orange-500",
+      "from-pink-500 to-rose-500",
+    ];
+
+    const newCategory = {
+      key: newCategoryName.toLowerCase().replace(/\s+/g, "-"),
+      title: newCategoryName,
+      emoji: newCategoryEmoji,
+      description: newCategoryDescription,
+      budget: Number(newCategoryLimit),
+      used: 0,
+      usedPct: 0,
+      gradient: gradients[customCategories.length % gradients.length],
+    };
+
+    setCustomCategories([...customCategories, newCategory]);
+    localStorage.setItem(
+      "cardsmart.customCategories",
+      JSON.stringify([...customCategories, newCategory]),
+    );
+
+    setNewCategoryName("");
+    setNewCategoryDescription("");
+    setNewCategoryLimit("");
+    setNewCategoryEmoji("📦");
+    setShowAddCategory(false);
   }
 
   function openCategoryPicker() {
@@ -322,7 +388,7 @@ export default function Dashboard() {
           cardName: result.recommended_card.name,
           last4: result.recommended_card.last4,
           reason: result.recommended_card.reason,
-          timestamp: new Date(),
+          timestamp: Date.now(),
         },
       ]);
     } catch (e) {
@@ -374,7 +440,7 @@ export default function Dashboard() {
           cardName: recommendation.recommended_card.name,
           last4: recommendation.recommended_card.last4,
           reason: recommendation.recommended_card.reason,
-          timestamp: new Date(),
+          timestamp: Date.now(),
         },
       ]);
     } catch (e) {
@@ -894,17 +960,13 @@ export default function Dashboard() {
                       </p>
                       <p className="text-xs text-slate-500">
                         {(() => {
-                          const now = new Date();
-                          const diff = Math.floor(
-                            (now.getTime() -
-                              new Date(
-                                now.getTime() - Math.random() * 3600000,
-                              ).getTime()) /
-                              60000,
-                          );
-                          return diff < 60
-                            ? `${diff} min ago`
-                            : `${Math.floor(diff / 60)} hr ago`;
+                          const now = Date.now();
+                          const diff = Math.floor((now - tx.timestamp) / 60000);
+                          if (diff < 1) return "Just now";
+                          if (diff < 60) return `${diff} min ago`;
+                          const hours = Math.floor(diff / 60);
+                          if (hours < 24) return `${hours} hr ago`;
+                          return `${Math.floor(hours / 24)} day ago`;
                         })()}
                       </p>
                     </div>
@@ -963,9 +1025,31 @@ export default function Dashboard() {
       </section>
 
       <div>
-        <h3 className="text-4xl font-bold text-slate-900">Virtual Cards</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-4xl font-bold text-slate-900">Virtual Cards</h3>
+          <button
+            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all hover:bg-indigo-700 hover:shadow-xl"
+            onClick={() => setShowAddCategory(true)}
+            type="button"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M12 4v16m8-8H4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Add Category
+          </button>
+        </div>
         <div className="mt-4 grid gap-6 md:grid-cols-2">
-          {categoryStats.map((item) => {
+          {[...categoryStats, ...customCategories].map((item) => {
             const tileId = `category-${item.key}`;
             return (
               <div
@@ -980,8 +1064,11 @@ export default function Dashboard() {
                   <div className="absolute right-6 top-6 h-8 w-12 rounded-md bg-white/30" />
 
                   <button
-                    className="absolute left-6 top-6 rounded-full bg-white/20 p-2 backdrop-blur-sm transition-all hover:bg-white/30"
-                    onClick={(e) => openCategorySettings(item.key, e)}
+                    className="absolute left-4 top-4 z-10 rounded-full bg-white/20 p-2 backdrop-blur-sm transition-all hover:bg-white/30"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCategorySettings(item.key, e);
+                    }}
                     type="button"
                   >
                     <svg
@@ -1341,6 +1428,115 @@ export default function Dashboard() {
                   type="button"
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-2xl font-bold text-slate-900">
+                Add New Category
+              </h3>
+              <button
+                className="rounded-full p-2 hover:bg-slate-100"
+                onClick={() => setShowAddCategory(false)}
+                type="button"
+              >
+                <svg
+                  className="h-6 w-6 text-slate-500"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M6 18L18 6M6 6l12 12"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Category Emoji
+                </label>
+                <input
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-2xl text-center focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  maxLength={2}
+                  onChange={(e) => setNewCategoryEmoji(e.target.value)}
+                  placeholder="📦"
+                  type="text"
+                  value={newCategoryEmoji}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Category Name *
+                </label>
+                <input
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="e.g., Entertainment, Health, Education"
+                  type="text"
+                  value={newCategoryName}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Description
+                </label>
+                <textarea
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  onChange={(e) => setNewCategoryDescription(e.target.value)}
+                  placeholder="What will this card be used for?"
+                  rows={3}
+                  value={newCategoryDescription}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Spending Limit *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">
+                    $
+                  </span>
+                  <input
+                    className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-xl font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    onChange={(e) => setNewCategoryLimit(e.target.value)}
+                    placeholder="0.00"
+                    type="number"
+                    value={newCategoryLimit}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  className="flex-1 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                  onClick={() => setShowAddCategory(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                  disabled={!newCategoryName.trim() || !newCategoryLimit}
+                  onClick={handleAddCategory}
+                  type="button"
+                >
+                  Add Category
                 </button>
               </div>
             </div>
